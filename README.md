@@ -1,1 +1,3 @@
-Navigation Mesh project - currently working on
+Navigation Mesh project
+
+An implementation of a naive hexagonal navigation mesh
