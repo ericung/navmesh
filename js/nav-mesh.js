@@ -5,9 +5,9 @@
 
 // global variables
 const TRIANGLESIZE = 2;
-const POINTWIDTH = 10;
-const POINTHEIGHT = 10;
-const BOIDCOUNT = 10;
+const POINTWIDTH = 5;
+const POINTHEIGHT = 5;
+const BOIDCOUNT = 5;
 const OBSTACLECOUNT = 0;
 const NODECOUNT = POINTWIDTH*POINTHEIGHT;
 
@@ -63,7 +63,7 @@ function init(){
 
     // put a camera in the scene
     camera	= new THREE.PerspectiveCamera(35, window.innerWidth / window.innerHeight, 1, 10000 );
-    camera.position.set(0, 0, 100);
+    camera.position.set(0, 0, 25);
     scene.add(camera);
 
     // create a camera contol
@@ -117,18 +117,16 @@ function init(){
     // draw points
     for (var i=0; i<POINTWIDTH; i++){
         for (var j=0; j<POINTHEIGHT; j++){
+            // draw points
             var geom = new THREE.SphereGeometry(.1,16,8);
             var mat = new THREE.MeshLambertMaterial({
                             ambient:0x808080,
-                            color:Math.random()*0xffffff
+                            color:0xffffff
                             });
             var dot = new THREE.Mesh(geom,mat);
-            if (j%2 == 0){
-                dot.position.set(point[i][j].x,point[i][j].y,1);
-            } else {
-                dot.position.set(point[i][j].x,point[i][j].y,1);
-            }
+            dot.position.set(point[i][j].x,point[i][j].y,1);
             scene.add(dot);
+            targetList.push(dot);
         }
     }
 
@@ -169,12 +167,20 @@ function constructBoids(){
     m_time = Math.random()*50+50;
     m_const = 1;
 
-    // construct goal, path, and traverse
-    goal = Math.floor(NODECOUNT*Math.random());
-    path = a_star(0);
-    traverse = path.length-1;
+    
+    setGoal(Math.floor(NODECOUNT/2),Math.floor(NODECOUNT*Math.random()));
 }
 
+
+// ================================================================================================
+
+
+// set a goal node for the boids
+function setGoal(current,g){
+    goal = g;
+    path = a_star(current);
+    traverse = path.length-1;
+}
 
 // ================================================================================================
 
@@ -211,10 +217,13 @@ function constructNavMesh(){
 
             // calculate neighbors for the navigation mesh
             node[pos].neighbor = new Array();
-            if ((j+1)%2 == 0){
-                // top
-                if ((i-1)>=0){
-                    node[pos].neighbor.push(pos-POINTWIDTH); }
+            // top
+            if ((i-1)>=0){
+                node[pos].neighbor.push(pos-POINTWIDTH); }
+             // bottom
+            if ((i+1)<POINTHEIGHT){
+                node[pos].neighbor.push(pos+POINTWIDTH);}
+            if ((j)%2 == 0){
                 // top left
                 if ((j-1)>=0){
                     node[pos].neighbor.push(pos-1);}
@@ -224,16 +233,10 @@ function constructNavMesh(){
                 // bottom left
                 if (((i+1)<POINTHEIGHT)&&((j-1)>=0)){
                     node[pos].neighbor.push(pos+POINTWIDTH-1);}
-                // bottom
-                if ((i+1)<POINTHEIGHT){
-                    node[pos].neighbor.push(pos+POINTWIDTH);}
                 // bottom right
                 if (((i+1)<POINTHEIGHT)&&((j+1)<POINTWIDTH)){
                     node[pos].neighbor.push(pos+POINTWIDTH+1);} 
             } else {
-                // top
-                if ((i-1)>=0){
-                    node[pos].neighbor.push(pos-POINTWIDTH); }
                 // top left
                 if (((i-1)>=0)&&((j-1)>=0)){
                     node[pos].neighbor.push(pos-POINTWIDTH-1);}
@@ -246,9 +249,6 @@ function constructNavMesh(){
                 // bottom left
                 if ((j+1)<POINTWIDTH){
                     node[pos].neighbor.push(pos+1);}
-                // bottom
-                if ((i+1)<POINTHEIGHT){
-                    node[pos].neighbor.push(pos+POINTWIDTH);}
             } 
             pos++;
         }
@@ -275,43 +275,18 @@ function onDocumentMouseDown( event ){
                                     vector.sub( camera.position ).normalize());
 
     // check for intersection
-    // i == 0 is the floor
-    // i > 0, dots
-    var touched = false; 
     for (var i=targetList.length; i>=0; i--){
         var intersects = ray.intersectObject( targetList[i] );
 
-        if (touched){
-            break;
-        }
-
         if (intersects.length > 0){
-            if (i==0){
-                var geometry = new THREE.SphereGeometry(2,16,8);
-                var material = new THREE.MeshLambertMaterial({
-                                ambient:0x808080,
-                                color:Math.random()*0xffffff});
-                var dot  = new THREE.Mesh(geometry,material);
-                dot.position.set(intersects[0].point.x,intersects[0].point.y,0);
-                scene.add(dot);
-                targetList.push(dot);
-
-                intersects[0].face.color.setRGB( 0.8*Math.random()+0.2,0,0 );
-                intersects[0].object.geometry.colorsNeedUpdate = true;
-            } else {
-                console.log("Hit Dot @ "    + intersects[0].point.x + "\t" 
-                                            + intersects[0].point.y + "\t"
-                                            + targetList[i].scale.x);
-                
-                // change the color of the closest face.
-                var s = targetList[i].scale.x;
-                targetList[i].scale.set(s*1.1, s*1.1, s*1.1);
-                targetList[i].geometry.radius += 1;
-            }
-            intersects[0].face.color.setRGB( 0.8*Math.random()+0.2,0,0 );
-            intersects[0].object.geometry.colorsNeedUpdate = true;
-
-            touched = true;
+            /*
+            console.log("Hit Dot @ "    + intersects[0].point.x + "\t" 
+                                        + intersects[0].point.y + "\t"
+                                        + targetList[i].scale.x);
+            */
+            targetList[i].material.setValues({ color: Math.random()*0xffffff });
+            setGoal(path[traverse],i);
+            // testPath();
         }
     }
 }
@@ -439,17 +414,14 @@ function limit_velocity(bi){
 // updates where boids go next
 function updatePathnode(bi){
     var where = path[traverse];
-    // check and see if boid[bi] is within distance to the current node
-    if ((boid[bi].position.distanceTo(node[where])) < 0.2){
+    // check if boids reached a point in the path
+    if ((boid[bi].position.distanceTo(node[where])) < 0.35){
         traverse--;
     }
 
+    // keep traverse at 0 
     if (traverse < 0){
-        //nodeView[goal].material.color.set(nodeColor);
-        goal = Math.floor(Math.random()*NODECOUNT);     // change goal
-        //nodeView[goal].material.color.set(Math.random()*0xffffff);
-        path = a_star(path[0]);                           // change path with new goal
-        traverse = path.length-1;                      // reset traverse
+        traverse = 0;
     }   
 }
 
@@ -535,6 +507,19 @@ function testa_star(ni) {
         return;
     }
     for (var i = 0; i<path.length; i++){
+        console.log(path[i]);
+    }
+}
+
+
+// ================================================================================================ 
+
+
+// test path
+function testPath(){
+    console.log("Path Traversed");
+    var i = 0;
+    for (var i=path.length;i>=0; i--){
         console.log(path[i]);
     }
 }
