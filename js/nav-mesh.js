@@ -17,13 +17,12 @@ var camera, cameraControl;
 // environment variables
 var point, node, floor;
 var mouse = {x:0, y:0};
-var targetList = [];
+var targetList = [];    // target the nav-mesh nodes only
 
-// boid variables
-var boid, xstart, ystart,zstart;
-var xmin,xmax,ymin,ymax,zmin,zmax;
-var vlim, m_time, m_const;
-var goal,path,traverse;
+var boid, xstart, ystart,zstart;    // boid construct to operate on, boid start position
+var xmin,xmax,ymin,ymax,zmin,zmax;  // the boundaries for which the boids can travel
+var vlim, m_time, m_const;          // velocity limit of boids, keep track of time to group/flock
+var goal,path,traverse;             // indices to keep track of the boids
 
 // construct the navigation mesh before setting boids
 constructNavMesh();
@@ -67,7 +66,7 @@ function init(){
     scene.add(camera);
 
     // create a camera contol
-    cameraControls = new THREE.OrbitControls( camera, renderer.domElement );
+    //cameraControls = new THREE.OrbitControls( camera, renderer.domElement );
 
     // transparently support window resize
     THREEx.WindowResize.bind(renderer, camera);
@@ -167,7 +166,6 @@ function constructBoids(){
     m_time = Math.random()*50+50;
     m_const = 1;
 
-    
     setGoal(Math.floor(NODECOUNT/2),Math.floor(NODECOUNT*Math.random()));
 }
 
@@ -199,7 +197,6 @@ function constructNavMesh(){
     for (var i=0; i<POINTWIDTH; i++){
         point[i] = new Array(POINTWIDTH);
     }
-
 
     // calculate and store points for navigation mesh
     var pos = 0;
@@ -266,7 +263,21 @@ function onDocumentMouseDown( event ){
     mouse.y = - ( event.clientY / window.innerHeight ) * 2 + 1;
 
     // find intersections
+    console.log( event.button );
 
+    // check if left click
+    switch (event.button){
+       case 0: leftClick(); break;
+       case 2: rightClick(); break;
+    }
+}
+
+
+// ================================================================================================
+
+
+// left mouse button
+function leftClick(){
     // create a Ray with origin at the mouse position
     //  and direction into the scene (camera direction)
     var vector = new THREE.Vector3( mouse.x, mouse.y, 1 );
@@ -274,19 +285,15 @@ function onDocumentMouseDown( event ){
     var ray = new THREE.Raycaster(  camera.position, 
                                     vector.sub( camera.position ).normalize());
 
-    // check for intersection
+    // check for intersection for each object while keeping index so values can be modified
     for (var i=targetList.length; i>=0; i--){
         var intersects = ray.intersectObject( targetList[i] );
 
         if (intersects.length > 0){
-            /*
-            console.log("Hit Dot @ "    + intersects[0].point.x + "\t" 
-                                        + intersects[0].point.y + "\t"
-                                        + targetList[i].scale.x);
-            */
             targetList[i].material.setValues({ color: Math.random()*0xffffff });
+            
+            // set goal to the clicked object
             setGoal(path[traverse],i);
-            // testPath();
         }
     }
 }
@@ -295,7 +302,34 @@ function onDocumentMouseDown( event ){
 // ================================================================================================
 
 
-// Center of mass
+// right mouse button
+function rightClick(){
+    var vector = new THREE.Vector3( mouse.x, mouse.y, 1);
+    projector.unprojectVector ( vector, camera );
+    var ray = new THREE.Raycaster(  camera.position,
+                                    vector.sub( camera.position ).normalize()); 
+    
+    // check for intersection for each object while keeping index so values can be modified
+    for (var i=targetList.length; i>=0; i--){
+        var intersects = ray.intersectObject( targetList[i] );
+
+        if (intersects.length > 0){
+            if (path[traverse] != i){
+                targetList[i].material.setValues({ color: Math.random()*0xffffff });
+
+                // set goal to the current node in path
+                setGoal(path[traverse], path[traverse]);
+            }
+            
+        }
+    }
+}
+
+
+// ================================================================================================
+
+
+// Sum all positions so we only need to do it once in the boids algorithm below
 function computeMag(){
     var center = new THREE.Vector3(0,0,0);
 
@@ -459,13 +493,12 @@ function a_star(ni){
 
         for (var i=0; i<node[current].neighbor.length; i++){
             neighbor = node[current].neighbor[i];
+
             tent_g_score = g_score[current] + node[current].distanceTo(node[neighbor]);
             tent_f_score = tent_g_score + node[neighbor].distanceTo(node[goal]) ;
             if ((closedset.indexOf(neighbor) != -1)&&(tent_f_score>=f_score[neighbor])){
                 continue;
             } 
-            
-            // openset.indexOf(neighbor) > -1 or tent_f_score < f_score[i]
             if ((openset.indexOf(neighbor)==-1) || (tent_f_score < f_score[neighbor])){
                 came_from[neighbor] = current;
                 g_score[neighbor] = tent_g_score;
@@ -590,7 +623,7 @@ function render() {
     var PIseconds	= Date.now() * Math.PI;
 
     // update camera controls
-    cameraControls.update();
+    // cameraControls.update();
 
     // actually render the scene
     renderer.render( scene, camera );
