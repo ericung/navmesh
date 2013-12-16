@@ -8,13 +8,16 @@ const TRIANGLESIZE = 2;
 const POINTWIDTH = 5;
 const POINTHEIGHT = 5;
 const BOIDCOUNT = 5;
-const OBSTACLECOUNT = 0;
 const NODECOUNT = POINTWIDTH*POINTHEIGHT;
 
 // states of the nodes
 const ON = 0;
 const OFF = 1;
 const REMOVED = 2;
+
+// keep track of obstacles for boids to avoid
+var OBSTACLECOUNT = 0;
+var obstacle;
 
 var BOIDCOLOR = Math.floor(Math.random()*0xffffff);
 var NODECOLOR = 0x000088;
@@ -204,6 +207,7 @@ function constructNavMesh(){
     // memory for navigation mesh
     point = new Array(POINTWIDTH); 
     node = new Array(NODECOUNT);
+    obstacle = new Array();
 
     // temp variables
     var w = Math.floor(POINTWIDTH/2)
@@ -301,8 +305,17 @@ function setGoalColor(g){
 
 // Reset color of node and set state original
 function resetColor(i){
+    // if state removed, remove from obstacle list
+    if (targetList[i].state == REMOVED){
+        var tmp = obstacle.indexOf(i);
+        obstacle.splice(tmp,1)
+        OBSTACLECOUNT--;
+        targetList[i].position.set(targetList[i].position.x,targetList[i].position.y,-1);
+    }
+
     targetList[i].state = ON;
     targetList[i].material.setValues({ color: NODECOLOR });
+    
 }
 
 
@@ -313,6 +326,11 @@ function resetColor(i){
 function setRemovedColor(r){
     targetList[r].state = REMOVED;
     targetList[r].material.setValues({ color: REMOVEDNODECOLOR });
+
+    // also add r to the obstacles so boids can avoid colliding with it
+    obstacle.push(r);
+    OBSTACLECOUNT++;
+    targetList[r].position.set(targetList[r].position.x,targetList[r].position.y,1);
 }
 
 
@@ -550,17 +568,18 @@ function computeVelocity(bi, mag){
     // move away from obstacles
     temp.set(0,0,0);
     for (var j=0; j<OBSTACLECOUNT; j++){
+        var key = obstacle[j];
         // check collision
-        if (obstacle[j].position.distanceTo(boid[bi].position) < 1.1){
-            temp.sub(obstacle[j].position);
+        if (targetList[key].position.distanceTo(boid[bi].position) < 1.1){
+            temp.sub(targetList[key].position);
             temp.add(boid[bi].position);
         }
         velocity.add(temp);
         // attempt to keep a distance
         
         temp.set(0,0,0);
-        if (obstacle[j].position.distanceTo(boid[bi].position) < 1.6){
-            temp.subVectors(obstacle[j].position, boid[bi].position);
+        if (targetList[key].position.distanceTo(boid[bi].position) < 1.6){
+            temp.subVectors(targetList[key].position, boid[bi].position);
             temp.divideScalar(-100);
         }
         //velocity.add(temp);
