@@ -263,7 +263,7 @@ function onDocumentMouseDown( event ){
     mouse.y = - ( event.clientY / window.innerHeight ) * 2 + 1;
 
     // find intersections
-    console.log( event.button );
+    console.log( "back: " + event.button );
 
     // check if left click
     switch (event.button){
@@ -317,11 +317,69 @@ function rightClick(){
             if (path[traverse] != i){
                 targetList[i].material.setValues({ color: Math.random()*0xffffff });
 
+                removeNeighbor(i);
+
                 // set goal to the current node in path
                 setGoal(path[traverse], path[traverse]);
             }
-            
         }
+    }
+}
+
+
+// ================================================================================================
+
+
+// remove neighbor i from the set of all neighbors in node list
+function removeNeighbor(pos){
+    var tmp;
+    var j = pos % POINTWIDTH;
+    var i = (pos - j) / POINTWIDTH;
+    console.log("i: " + i + "\tj: " + j);
+
+
+    // top
+    if ((i-1)>=0){
+        tmp = node[pos-POINTWIDTH].neighbor.indexOf(pos)
+        node[pos-POINTWIDTH].neighbor.splice(tmp, 1); }
+        // bottom
+    if ((i+1)<POINTHEIGHT){
+        tmp = node[pos+POINTWIDTH].neighbor.indexOf(pos)
+        node[pos+POINTWIDTH].neighbor.splice(tmp, 1); }
+    if ((j)%2 == 0){
+        // top left
+        if ((j-1)>=0){
+            tmp = node[pos-1].neighbor.indexOf(pos)
+            node[pos-1].neighbor.splice(tmp, 1); }
+        // top right
+        if ((j+1)<POINTWIDTH){
+            tmp = node[pos+1].neighbor.indexOf(pos)
+            node[pos+1].neighbor.splice(tmp, 1); }
+        // bottom left
+        if (((i+1)<POINTHEIGHT)&&((j-1)>=0)){
+            tmp = node[pos+POINTWIDTH-1].neighbor.indexOf(pos)
+            node[pos+POINTWIDTH-1].neighbor.splice(tmp, 1); }
+        // bottom right
+        if (((i+1)<POINTHEIGHT)&&((j+1)<POINTWIDTH)){
+            tmp = node[pos+POINTWIDTH+1].neighbor.indexOf(pos)
+            node[pos+POINTWIDTH+1].neighbor.splice(tmp, 1); }
+    } else {
+        // top left
+        if (((i-1)>=0)&&((j-1)>=0)){
+            tmp = node[pos-POINTWIDTH-1].neighbor.indexOf(pos)
+            node[pos-POINTWIDTH-1].neighbor.splice(tmp, 1); }
+        // top right
+        if (((i-1)>=0)&&((j+1)<POINTWIDTH)){
+            tmp = node[pos-POINTWIDTH+1].neighbor.indexOf(pos)
+            node[pos-POINTWIDTH+1].neighbor.splice(tmp, 1); }
+        // bottom right
+        if ((j-1)>=0){
+            tmp = node[pos-1].neighbor.indexOf(pos)
+            node[pos-1].neighbor.splice(tmp, 1); }
+        // bottom left
+        if ((j+1)<POINTWIDTH){
+            tmp = node[pos+1].neighbor.indexOf(pos)
+            node[pos+1].neighbor.splice(tmp, 1); }
     }
 }
 
