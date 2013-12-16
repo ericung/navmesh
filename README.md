@@ -45,6 +45,7 @@ Now to get the six neighbors of node p with i,j calculated, use the heuristic:
 3. Need to modularize more, so I can add to future projects if I want. I just wrote whatever came up in my head.
 4. Non-nodal navigation meshes.
 5. A monster that chomps on the boids. (See 3. Need more modularizing).
+6. Firefox Browser/Android run slower (30 fps) on my computer, otherwise on Chrome gets (60 fps).
 
 [1]: http://www.vergenet.net/~conrad/boids/pseudocode.html
 [2]: http://en.wikipedia.org/wiki/A*_search_algorithm
