@@ -11,6 +11,16 @@ const BOIDCOUNT = 5;
 const OBSTACLECOUNT = 0;
 const NODECOUNT = POINTWIDTH*POINTHEIGHT;
 
+// states of the nodes
+const ON = 0;
+const OFF = 1;
+const REMOVED = 2;
+
+var BOIDCOLOR = Math.floor(Math.random()*0xffffff);
+var NODECOLOR = 0x000088;
+var OFFNODECOLOR = 0x00FF00;
+var REMOVEDNODECOLOR = 0xFF0000;
+
 var stats, scene, renderer, composer;
 var camera, cameraControl;
 
@@ -110,22 +120,22 @@ function init(){
     var floorGeometry = new THREE.PlaneGeometry(1000, 1000, 10, 10);
     floor = new THREE.Mesh(floorGeometry, floorMaterial);
     floor.position.z = -1;
-    //scene.add(floor);
-    //targetList.push(floor);
 
-    // draw points
+    // draw points for illustration
     for (var i=0; i<POINTWIDTH; i++){
         for (var j=0; j<POINTHEIGHT; j++){
             // draw points
-            var geom = new THREE.SphereGeometry(.1,16,8);
+            var geom = new THREE.SphereGeometry(.5,16,8);
             var mat = new THREE.MeshLambertMaterial({
-                            ambient:0x808080,
-                            color:0xffffff
+                            ambient:0x888888,
+                            color:NODECOLOR,
+                            opacity:0.75
                             });
             var dot = new THREE.Mesh(geom,mat);
-            dot.position.set(point[i][j].x,point[i][j].y,1);
+            dot.position.set(point[i][j].x,point[i][j].y,-1);
             scene.add(dot);
             targetList.push(dot);
+            targetList[i*POINTWIDTH + j].state = ON;
         }
     }
 
@@ -133,7 +143,7 @@ function init(){
     var geometry = new THREE.SphereGeometry(0.1,16,8);
     var material = new THREE.MeshLambertMaterial({
                                     ambient: 0x808080,
-                                    color: Math.random()*0xffffff});
+                                    color: BOIDCOLOR});
     for(var i=0; i<BOIDCOUNT; i++){
         boid[i] = new THREE.Mesh( geometry, material );
         boid[i].position.setX(2*Math.random()+xstart);
@@ -177,7 +187,13 @@ function constructBoids(){
 function setGoal(current,g){
     goal = g;
     path = a_star(current);
-    traverse = path.length-1;
+    
+    // make sure some path exists
+    if (path.length > 0){
+        traverse = path.length-1;
+    } else {
+        traverse = 0;
+    }
 }
 
 // ================================================================================================
@@ -190,8 +206,8 @@ function constructNavMesh(){
     node = new Array(NODECOUNT);
 
     // temp variables
-    var w = POINTWIDTH/2;
-    var h = POINTHEIGHT/2;
+    var w = Math.floor(POINTWIDTH/2)
+    var h = Math.floor(POINTHEIGHT/2)
 
     // allocate memory for nav-mesh points for picture
     for (var i=0; i<POINTWIDTH; i++){
@@ -262,14 +278,41 @@ function onDocumentMouseDown( event ){
     mouse.x = ( event.clientX / window.innerWidth ) * 2 - 1;
     mouse.y = - ( event.clientY / window.innerHeight ) * 2 + 1;
 
-    // find intersections
-    console.log( "back: " + event.button );
-
     // check if left click
     switch (event.button){
        case 0: leftClick(); break;
        case 2: rightClick(); break;
     }
+}
+
+
+// ================================================================================================
+
+
+// Change goal node color and set state off
+function setGoalColor(g){
+    targetList[g].state = OFF;
+    targetList[g].material.setValues({ color: OFFNODECOLOR });
+}
+
+
+// ================================================================================================
+
+
+// Reset color of node and set state original
+function resetColor(i){
+    targetList[i].state = ON;
+    targetList[i].material.setValues({ color: NODECOLOR });
+}
+
+
+// ================================================================================================
+
+
+// Change removed node color and mark it as removed
+function setRemovedColor(r){
+    targetList[r].state = REMOVED;
+    targetList[r].material.setValues({ color: REMOVEDNODECOLOR });
 }
 
 
@@ -290,10 +333,12 @@ function leftClick(){
         var intersects = ray.intersectObject( targetList[i] );
 
         if (intersects.length > 0){
-            targetList[i].material.setValues({ color: Math.random()*0xffffff });
-            
-            // set goal to the clicked object
-            setGoal(path[traverse],i);
+            // set goal to the clicked object if not removed
+            if (targetList[i].state != REMOVED){
+                resetColor(goal);
+                setGoal(path[traverse],i);
+                setGoalColor(i);
+            }
         }
     }
 }
@@ -315,12 +360,22 @@ function rightClick(){
 
         if (intersects.length > 0){
             if (path[traverse] != i){
-                targetList[i].material.setValues({ color: Math.random()*0xffffff });
+                
+                if (targetList[i].state != REMOVED){
+                    // removes i from the neighbor list of all nodes
+                    removeNeighbor(i);
 
-                removeNeighbor(i);
-
-                // set goal to the current node in path
-                setGoal(path[traverse], path[traverse]);
+                    // set goal to the current node in path
+                    resetColor(goal);
+                    setGoal(path[traverse], path[traverse]);
+                    setGoalColor(path[traverse]);
+                    setRemovedColor(i);
+                } else {
+                    // adds the node back
+                    resetColor(i);
+                    addNeighbor(i);
+                    setGoal(path[traverse], goal);
+                }
             }
         }
     }
@@ -333,9 +388,10 @@ function rightClick(){
 // remove neighbor i from the set of all neighbors in node list
 function removeNeighbor(pos){
     var tmp;
+
+    // convert to i,j format
     var j = pos % POINTWIDTH;
     var i = (pos - j) / POINTWIDTH;
-    console.log("i: " + i + "\tj: " + j);
 
 
     // top
@@ -380,6 +436,51 @@ function removeNeighbor(pos){
         if ((j+1)<POINTWIDTH){
             tmp = node[pos+1].neighbor.indexOf(pos)
             node[pos+1].neighbor.splice(tmp, 1); }
+    }
+}
+
+
+// ================================================================================================
+
+
+// add neighbor i to the six adjacent nodes 
+function addNeighbor(pos){
+    // convert to i,j format
+    var j = pos % POINTWIDTH;
+    var i = (pos - j) / POINTWIDTH;
+
+    // top
+    if ((i-1)>=0){
+        node[pos-POINTWIDTH].neighbor.push(pos); }
+        // bottom
+    if ((i+1)<POINTHEIGHT){
+        node[pos+POINTWIDTH].neighbor.push(pos); }
+    if ((j)%2 == 0){
+        // top left
+        if ((j-1)>=0){
+            node[pos-1].neighbor.push(pos) }
+        // top right
+        if ((j+1)<POINTWIDTH){
+            node[pos+1].neighbor.push(pos) }
+        // bottom left
+        if (((i+1)<POINTHEIGHT)&&((j-1)>=0)){
+            node[pos+POINTWIDTH-1].neighbor.push(pos); }
+        // bottom right
+        if (((i+1)<POINTHEIGHT)&&((j+1)<POINTWIDTH)){
+            node[pos+POINTWIDTH+1].neighbor.push(pos); }
+    } else {
+        // top left
+        if (((i-1)>=0)&&((j-1)>=0)){
+            node[pos-POINTWIDTH-1].neighbor.push(pos); }
+        // top right
+        if (((i-1)>=0)&&((j+1)<POINTWIDTH)){
+            node[pos-POINTWIDTH+1].neighbor.push(pos); }
+        // bottom right
+        if ((j-1)>=0){
+            node[pos-1].neighbor.push(pos); }
+        // bottom left
+        if ((j+1)<POINTWIDTH){
+            node[pos+1].neighbor.push(pos) }
     }
 }
 
@@ -439,10 +540,12 @@ function computeVelocity(bi, mag){
     velocity.add(temp);
 
     // tendacy towards goal
-    temp.set(0,0,0);
-    temp.subVectors(node[path[traverse]], boid[bi].position);
-    temp.divideScalar(100);
-    velocity.add(temp);
+    if (path !== undefined){
+        temp.set(0,0,0);
+        temp.subVectors(node[path[traverse]], boid[bi].position);
+        temp.divideScalar(100);
+        velocity.add(temp);
+    }
 
     // move away from obstacles
     temp.set(0,0,0);
@@ -505,7 +608,15 @@ function limit_velocity(bi){
 
 // updates where boids go next
 function updatePathnode(bi){
+    // if no path exists exit
+    if (path.length <= 0){
+        return;
+    }
     var where = path[traverse];
+    if (where === undefined){
+        console.log (traverse);
+        return;
+    }
     // check if boids reached a point in the path
     if ((boid[bi].position.distanceTo(node[where])) < 0.35){
         traverse--;
@@ -567,7 +678,8 @@ function a_star(ni){
             }
         }
     }
-    return undefined;
+    // return a path that directs itself to itself
+    return new Array(ni,ni);
 }
 
 
