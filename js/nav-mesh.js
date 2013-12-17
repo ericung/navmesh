@@ -45,9 +45,7 @@ constructBoids();
 
 if( !init() )	animate();
 
-
 // ================================================================================================
-
 
 // init the scene
 function init(){
@@ -158,9 +156,7 @@ function init(){
     
 }
 
-
 // ================================================================================================
-
 
 // construct the boids
 function constructBoids(){
@@ -182,9 +178,7 @@ function constructBoids(){
     setGoal(Math.floor(NODECOUNT/2),Math.floor(NODECOUNT*Math.random()));
 }
 
-
 // ================================================================================================
-
 
 // set a goal node for the boids
 function setGoal(current,g){
@@ -200,7 +194,6 @@ function setGoal(current,g){
 }
 
 // ================================================================================================
-
 
 // Construct navigation mesh
 function constructNavMesh(){
@@ -234,47 +227,67 @@ function constructNavMesh(){
 
             // calculate neighbors for the navigation mesh
             node[pos].neighbor = new Array();
-            // top
-            if ((i-1)>=0){
-                node[pos].neighbor.push(pos-POINTWIDTH); }
-             // bottom
-            if ((i+1)<POINTHEIGHT){
-                node[pos].neighbor.push(pos+POINTWIDTH);}
-            if ((j)%2 == 0){
-                // top left
-                if ((j-1)>=0){
-                    node[pos].neighbor.push(pos-1);}
-                // top right
-                if ((j+1)<POINTWIDTH){
-                    node[pos].neighbor.push(pos+1);}
-                // bottom left
-                if (((i+1)<POINTHEIGHT)&&((j-1)>=0)){
-                    node[pos].neighbor.push(pos+POINTWIDTH-1);}
-                // bottom right
-                if (((i+1)<POINTHEIGHT)&&((j+1)<POINTWIDTH)){
-                    node[pos].neighbor.push(pos+POINTWIDTH+1);} 
-            } else {
-                // top left
-                if (((i-1)>=0)&&((j-1)>=0)){
-                    node[pos].neighbor.push(pos-POINTWIDTH-1);}
-                // top right
-                if (((i-1)>=0)&&((j+1)<POINTWIDTH)){
-                    node[pos].neighbor.push(pos-POINTWIDTH+1);}
-                // bottom right
-                if ((j-1)>=0){
-                    node[pos].neighbor.push(pos-1);}
-                // bottom left
-                if ((j+1)<POINTWIDTH){
-                    node[pos].neighbor.push(pos+1);}
-            } 
             pos++;
         }
     }
-}
 
+    for (var i=0; i<NODECOUNT; i++){
+        hexMap(i, pushNeighbor); 
+    }
+}
 
 // ================================================================================================
 
+// push a node pos into the neighbor list of node el
+function pushNeighbor(pos, el){
+    node[el].neighbor.push(pos); 
+}
+
+// ================================================================================================
+
+// maps a function to the navigation mesh - as seen in github
+function hexMap(pos, func){
+    // convert pos to i,j format
+    var j = pos % POINTWIDTH;
+    var i = (pos-j)/POINTWIDTH;
+    
+    // top
+    if ((i-1)>=0){
+        func(pos,pos-POINTWIDTH);} 
+        // bottom
+    if ((i+1)<POINTHEIGHT){
+        func(pos,pos+POINTWIDTH);}
+    if ((j)%2 == 0){
+        // top left
+        if ((j-1)>=0){
+            func(pos,pos-1);}        
+        // top right
+        if ((j+1)<POINTWIDTH){
+            func(pos,pos+1);} 
+        // bottom left
+        if (((i+1)<POINTHEIGHT)&&((j-1)>=0)){
+            func(pos,pos+POINTWIDTH-1);}        
+        // bottom right
+        if (((i+1)<POINTHEIGHT)&&((j+1)<POINTWIDTH)){
+            func(pos,pos+POINTWIDTH+1);}
+    } else {
+        // top left
+        if (((i-1)>=0)&&((j-1)>=0)){
+            func(pos,pos-POINTWIDTH-1);} 
+        // top right
+        if (((i-1)>=0)&&((j+1)<POINTWIDTH)){
+            func(pos,pos-POINTWIDTH+1);}
+        // bottom right
+        if ((j-1)>=0){
+            func(pos,pos-1);} 
+        // bottom left
+        if ((j+1)<POINTWIDTH){
+            func(pos,pos+1);}
+    } 
+    pos++;
+}
+
+// ================================================================================================
 
 // mouse down
 function onDocumentMouseDown( event ){
@@ -289,9 +302,7 @@ function onDocumentMouseDown( event ){
     }
 }
 
-
 // ================================================================================================
-
 
 // Change goal node color and set state off
 function setGoalColor(g){
@@ -299,9 +310,7 @@ function setGoalColor(g){
     targetList[g].material.setValues({ color: OFFNODECOLOR });
 }
 
-
 // ================================================================================================
-
 
 // Reset color of node and set state original
 function resetColor(i){
@@ -318,9 +327,7 @@ function resetColor(i){
     
 }
 
-
 // ================================================================================================
-
 
 // Change removed node color and mark it as removed
 function setRemovedColor(r){
@@ -333,14 +340,10 @@ function setRemovedColor(r){
     targetList[r].position.set(targetList[r].position.x,targetList[r].position.y,1);
 }
 
-
 // ================================================================================================
-
 
 // left mouse button
 function leftClick(){
-    // create a Ray with origin at the mouse position
-    //  and direction into the scene (camera direction)
     var vector = new THREE.Vector3( mouse.x, mouse.y, 1 );
     projector.unprojectVector ( vector, camera );
     var ray = new THREE.Raycaster(  camera.position, 
@@ -361,9 +364,7 @@ function leftClick(){
     }
 }
 
-
 // ================================================================================================
-
 
 // right mouse button
 function rightClick(){
@@ -381,7 +382,7 @@ function rightClick(){
                 
                 if (targetList[i].state != REMOVED){
                     // removes i from the neighbor list of all nodes
-                    removeNeighbor(i);
+                    hexMap(i, spliceNeighbor);
 
                     // set goal to the current node in path
                     resetColor(goal);
@@ -391,7 +392,7 @@ function rightClick(){
                 } else {
                     // adds the node back
                     resetColor(i);
-                    addNeighbor(i);
+                    hexMap(i, pushNeighbor);
                     setGoal(path[traverse], goal);
                 }
             }
@@ -399,127 +400,26 @@ function rightClick(){
     }
 }
 
-
 // ================================================================================================
 
-
-// remove neighbor i from the set of all neighbors in node list
-function removeNeighbor(pos){
-    var tmp;
-
-    // convert to i,j format
-    var j = pos % POINTWIDTH;
-    var i = (pos - j) / POINTWIDTH;
-
-
-    // top
-    if ((i-1)>=0){
-        tmp = node[pos-POINTWIDTH].neighbor.indexOf(pos)
-        node[pos-POINTWIDTH].neighbor.splice(tmp, 1); }
-        // bottom
-    if ((i+1)<POINTHEIGHT){
-        tmp = node[pos+POINTWIDTH].neighbor.indexOf(pos)
-        node[pos+POINTWIDTH].neighbor.splice(tmp, 1); }
-    if ((j)%2 == 0){
-        // top left
-        if ((j-1)>=0){
-            tmp = node[pos-1].neighbor.indexOf(pos)
-            node[pos-1].neighbor.splice(tmp, 1); }
-        // top right
-        if ((j+1)<POINTWIDTH){
-            tmp = node[pos+1].neighbor.indexOf(pos)
-            node[pos+1].neighbor.splice(tmp, 1); }
-        // bottom left
-        if (((i+1)<POINTHEIGHT)&&((j-1)>=0)){
-            tmp = node[pos+POINTWIDTH-1].neighbor.indexOf(pos)
-            node[pos+POINTWIDTH-1].neighbor.splice(tmp, 1); }
-        // bottom right
-        if (((i+1)<POINTHEIGHT)&&((j+1)<POINTWIDTH)){
-            tmp = node[pos+POINTWIDTH+1].neighbor.indexOf(pos)
-            node[pos+POINTWIDTH+1].neighbor.splice(tmp, 1); }
-    } else {
-        // top left
-        if (((i-1)>=0)&&((j-1)>=0)){
-            tmp = node[pos-POINTWIDTH-1].neighbor.indexOf(pos)
-            node[pos-POINTWIDTH-1].neighbor.splice(tmp, 1); }
-        // top right
-        if (((i-1)>=0)&&((j+1)<POINTWIDTH)){
-            tmp = node[pos-POINTWIDTH+1].neighbor.indexOf(pos)
-            node[pos-POINTWIDTH+1].neighbor.splice(tmp, 1); }
-        // bottom right
-        if ((j-1)>=0){
-            tmp = node[pos-1].neighbor.indexOf(pos)
-            node[pos-1].neighbor.splice(tmp, 1); }
-        // bottom left
-        if ((j+1)<POINTWIDTH){
-            tmp = node[pos+1].neighbor.indexOf(pos)
-            node[pos+1].neighbor.splice(tmp, 1); }
-    }
+// splice node pos from node ni's neighbor list
+function spliceNeighbor(pos, ni){
+    var tmp = node[ni].neighbor.indexOf(pos);
+    node[ni].neighbor.splice(tmp,1);
 }
 
-
 // ================================================================================================
-
-
-// add neighbor i to the six adjacent nodes 
-function addNeighbor(pos){
-    // convert to i,j format
-    var j = pos % POINTWIDTH;
-    var i = (pos - j) / POINTWIDTH;
-
-    // top
-    if ((i-1)>=0){
-        node[pos-POINTWIDTH].neighbor.push(pos); }
-        // bottom
-    if ((i+1)<POINTHEIGHT){
-        node[pos+POINTWIDTH].neighbor.push(pos); }
-    if ((j)%2 == 0){
-        // top left
-        if ((j-1)>=0){
-            node[pos-1].neighbor.push(pos) }
-        // top right
-        if ((j+1)<POINTWIDTH){
-            node[pos+1].neighbor.push(pos) }
-        // bottom left
-        if (((i+1)<POINTHEIGHT)&&((j-1)>=0)){
-            node[pos+POINTWIDTH-1].neighbor.push(pos); }
-        // bottom right
-        if (((i+1)<POINTHEIGHT)&&((j+1)<POINTWIDTH)){
-            node[pos+POINTWIDTH+1].neighbor.push(pos); }
-    } else {
-        // top left
-        if (((i-1)>=0)&&((j-1)>=0)){
-            node[pos-POINTWIDTH-1].neighbor.push(pos); }
-        // top right
-        if (((i-1)>=0)&&((j+1)<POINTWIDTH)){
-            node[pos-POINTWIDTH+1].neighbor.push(pos); }
-        // bottom right
-        if ((j-1)>=0){
-            node[pos-1].neighbor.push(pos); }
-        // bottom left
-        if ((j+1)<POINTWIDTH){
-            node[pos+1].neighbor.push(pos) }
-    }
-}
-
-
-// ================================================================================================
-
 
 // Sum all positions so we only need to do it once in the boids algorithm below
 function computeMag(){
     var center = new THREE.Vector3(0,0,0);
-
     for (var i=0; i<BOIDCOUNT; i++){
         center.add(boid[i].position);
     }
-
     return center;
 }
 
-
 // ================================================================================================
-
 
 // boids algorithm - http://www.vergenet.net/~conrad/boids/pseudocode.html
 function computeVelocity(bi, mag){
@@ -608,9 +508,7 @@ function computeVelocity(bi, mag){
     return velocity;
 }
 
-
 // ================================================================================================
-
 
 // limit velocity
 function limit_velocity(bi){
@@ -621,21 +519,12 @@ function limit_velocity(bi){
     }
 }
     
-
 // ================================================================================================
-
 
 // updates where boids go next
 function updatePathnode(bi){
-    // if no path exists exit
-    if (path.length <= 0){
-        return;
-    }
     var where = path[traverse];
-    if (where === undefined){
-        console.log (traverse);
-        return;
-    }
+
     // check if boids reached a point in the path
     if ((boid[bi].position.distanceTo(node[where])) < 0.35){
         traverse--;
@@ -647,9 +536,7 @@ function updatePathnode(bi){
     }   
 }
 
-
 // ================================================================================================
-
 
 // A* search - http://en.wikipedia.org/wiki/A*_search_algorithm
 function a_star(ni){
@@ -701,9 +588,7 @@ function a_star(ni){
     return new Array(ni,ni);
 }
 
-
 // ================================================================================================ 
-
 
 // helper function for A*
 function reconstruct_path(c, g, s){
@@ -717,9 +602,7 @@ function reconstruct_path(c, g, s){
     return path;
 }
 
-
 // ================================================================================================ 
-
 
 // test function for a star
 function testa_star(ni) {
@@ -733,9 +616,7 @@ function testa_star(ni) {
     }
 }
 
-
 // ================================================================================================ 
-
 
 // test path
 function testPath(){
@@ -746,9 +627,7 @@ function testPath(){
     }
 }
 
-
 // ================================================================================================ 
-
 
 // test navigation mesh construction
 function testNavMesh(){
@@ -762,9 +641,7 @@ function testNavMesh(){
     }
 }
 
-
 // ================================================================================================ 
-
 
 // animation loop
 function animate() {
@@ -802,9 +679,7 @@ function animate() {
     stats.update();
 }
 
-
 // ================================================================================================
-
 
 // render the scene
 function render() {
